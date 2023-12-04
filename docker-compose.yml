@@ -1,0 +1,26 @@
+services:
+  api-app:
+    build:
+      context: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./myblog:/myblog
+    environment:
+      - DB_HOST=database
+      - DB_NAME=blog_db
+      - DB_USER=blog_user
+      - DB_PASS=123456
+
+    command: >
+      sh -c "python manage.py runserver 0.0.0.0:8000"
+  
+
+  database:
+    image: postgres:16.1-alpine3.18
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_DB=blog_db
+      - POSTGRES_USER=blog_user
+      - POSTGRES_PASSWORD=123456
