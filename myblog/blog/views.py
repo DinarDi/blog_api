@@ -1,4 +1,5 @@
 from rest_framework.decorators import action
+from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.viewsets import ModelViewSet
 
 from blog.models import Post
@@ -11,6 +12,9 @@ class PostViewSet(ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
     pagination_class = ListPagination
+    filter_backends = [SearchFilter, OrderingFilter]
+    search_fields = ['title', 'body']
+    ordering_fields = ['created']
 
     def get_permissions(self):
         if self.action in ['update', 'partial_update']:
@@ -36,7 +40,7 @@ class PostViewSet(ModelViewSet):
         """
         List method for get all posts
         """
-        queryset = self.get_queryset()
+        queryset = self.filter_queryset(self.get_queryset())
 
         # Pagination
         page = self.paginate_queryset(queryset)
@@ -50,7 +54,7 @@ class PostViewSet(ModelViewSet):
         """
         Action to get own posts
         """
-        queryset = self.get_queryset()
+        queryset = self.filter_queryset(self.get_queryset())
 
         # Pagination
         page = self.paginate_queryset(queryset)
