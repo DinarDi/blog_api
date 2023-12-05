@@ -27,6 +27,8 @@ class PermissionForUpdate(BasePermission):
     """
     Can update is the status is draft
     """
+    message = 'You can update after change status to draft'
+
     def has_object_permission(self, request, view, obj):
         return bool(
             request.method in ['PUT', 'PATCH'] and
