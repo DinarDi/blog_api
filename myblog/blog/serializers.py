@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
-from blog.models import Post
+from blog.models import Post, Comment
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -45,3 +45,14 @@ class PostSerializer(DynamicFieldsModelSerializer, PostBaseSerializer):
         model = Post
         fields = ('id', 'author', 'title', 'body',
                   'status', 'created', 'updated')
+
+
+class CommentSerializer(DynamicFieldsModelSerializer):
+    """
+    Serializer for comments
+    """
+    author = AuthorInfoSerializer(read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = ('id', 'author', 'body', 'created', 'updated')
