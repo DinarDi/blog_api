@@ -3,12 +3,13 @@ from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ModelViewSet, GenericViewSet
+from rest_framework import mixins
 
-from blog.models import Post
+from blog.models import Post, Comment
 from blog.pagination import ListPagination
 from blog.serializers import PostSerializer, CommentSerializer, PostDetailSerializer
-from blog.permissions import IsOwnerOrStaffOrReadOnly, PermissionForUpdate
+from blog.permissions import IsOwnerOrStaffOrReadOnly, PermissionForUpdate, ItsOwnerOrStaff
 
 
 class PostViewSet(ModelViewSet):
@@ -100,3 +101,47 @@ class PostViewSet(ModelViewSet):
     def perform_create(self, serializer):
         serializer.validated_data['author'] = self.request.user
         serializer.save()
+
+
+class CommentViewSet(mixins.RetrieveModelMixin,
+                     mixins.UpdateModelMixin,
+                     mixins.DestroyModelMixin,
+                     GenericViewSet):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
+    pagination_class = ListPagination
+    permission_classes = [ItsOwnerOrStaff]
+
+    def get_queryset(self):
+        if self.action == 'my_comments':
+            user = self.request.user
+            queryset = self.queryset.filter(author=user)
+            return queryset
+        else:
+            return self.queryset
+
+    def retrieve(self, request, pk=None, *args, **kwargs):
+        instance = self.get_object()
+        if self.request.user.is_staff:
+            serializer = self.get_serializer(instance,
+                                             fields=('id', 'author', 'body',
+                                                     'created', 'updated'))
+        else:
+            serializer = self.get_serializer(instance, fields=('id', 'body', 'created', 'updated'))
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def my_comments(self, request):
+        """
+        Action to get own comments
+        """
+        queryset = self.get_queryset()
+
+        # Pagination
+        page = self.paginate_queryset(queryset)
+        serializer = self.get_serializer(page, many=True,
+                                         fields=(
+                                             'id', 'body', 'created', 'updated'
+                                         ))
+        return self.get_paginated_response(serializer.data)
+
