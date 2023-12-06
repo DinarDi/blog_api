@@ -7,7 +7,7 @@ from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase, APIClient
 
 from blog.models import Post
-from blog.serializers import PostSerializer
+from blog.serializers import PostSerializer, PostDetailSerializer
 
 
 class GeneralMethodsForTest:
@@ -77,8 +77,8 @@ class PostApiTestCase(APITestCase, GeneralMethodsForTest):
         self.assertEqual(status.HTTP_200_OK, response.status_code)
 
         post = Post.objects.get(id=self.post_2.id)
-        serialized_data = PostSerializer(post, fields=('id', 'author', 'title',
-                                                       'body')).data
+        serialized_data = PostDetailSerializer(post, fields=('id', 'author', 'title',
+                                                             'body', 'comments')).data
         self.assertEqual(serialized_data, response.data)
 
     def test_search_posts(self):
