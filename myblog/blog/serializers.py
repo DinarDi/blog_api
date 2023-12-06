@@ -34,7 +34,7 @@ class PostBaseSerializer(serializers.ModelSerializer):
     """
     Base serializer with common fields
     """
-    author = AuthorInfoSerializer(read_only=True)
+    author = AuthorInfoSerializer()
 
 
 class PostSerializer(DynamicFieldsModelSerializer, PostBaseSerializer):
@@ -56,3 +56,15 @@ class CommentSerializer(DynamicFieldsModelSerializer):
     class Meta:
         model = Comment
         fields = ('id', 'author', 'body', 'created', 'updated')
+
+
+class PostDetailSerializer(DynamicFieldsModelSerializer, PostBaseSerializer):
+    """
+    Serializer with detail info for posts
+    """
+    comments = CommentSerializer(many=True)
+
+    class Meta:
+        model = Post
+        fields = ('id', 'author', 'title', 'body',
+                  'status', 'created', 'updated', 'comments')
