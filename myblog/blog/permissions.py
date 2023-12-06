@@ -35,3 +35,14 @@ class PermissionForUpdate(BasePermission):
             (request.data.get('status', None) == 'DF' or
              obj.status == 'DF')
         )
+
+
+class ItsOwnerOrStaff(BasePermission):
+    """
+    Can do something if it's owner or staff
+    """
+    def has_object_permission(self, request, view, obj):
+        return bool(
+            request.user and request.user.is_authenticated and
+            (obj.author == request.user or request.user.is_staff)
+        )
