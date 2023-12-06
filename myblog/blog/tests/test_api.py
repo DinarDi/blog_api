@@ -6,8 +6,8 @@ from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase, APIClient
 
-from blog.models import Post
-from blog.serializers import PostSerializer, PostDetailSerializer
+from blog.models import Post, Comment
+from blog.serializers import PostSerializer, PostDetailSerializer, CommentSerializer
 
 
 class GeneralMethodsForTest:
@@ -355,3 +355,134 @@ class PaginationTestCase(APITestCase, GeneralMethodsForTest):
         response_2 = api_client.get(url, {'page_size': 'asd'})
         self.assertEqual(status.HTTP_404_NOT_FOUND, response_2.status_code)
         self.assertEqual(expected_data, response_2.data)
+
+
+class CommentsApiTestCase(APITestCase, GeneralMethodsForTest):
+    def setUp(self):
+        self.test_user_1 = User.objects.create(username='test_user_1', first_name='Name',
+                                               last_name='Another')
+        self.test_user_2 = User.objects.create(username='test_user_2', first_name='MyName')
+        self.test_user_3 = User.objects.create(username='test_user_3',
+                                               is_staff=True)
+
+        self.post_1 = Post.objects.create(title='Some post new', body='Some body',
+                                          author=self.test_user_1, status='PB')
+        self.post_2 = Post.objects.create(title='Some post 2', body='Some body 2',
+                                          author=self.test_user_2, status='PB')
+        self.post_3 = Post.objects.create(title='Some post 3', body='Some body new 3',
+                                          author=self.test_user_1, status='PB')
+
+        self.comment = Comment.objects.create(author=self.test_user_1, post=self.post_1, body='Test comment')
+
+    def test_add_comment(self):
+        url = reverse('post-add-comment', args=(self.post_2.id, ))
+        api_client = self.get_client(self.test_user_1)
+        data = {
+            'body': 'Test comment'
+        }
+        json_data = json.dumps(data)
+        response = api_client.post(url, data=json_data, content_type='application/json')
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        comments_count = self.post_2.comments.count()
+        self.assertEqual(1, comments_count)
+        self.assertEqual('Test comment', self.post_2.comments.last().body)
+
+    def test_get_my_comments(self):
+        url = reverse('comment-my-comments')
+        api_client = self.get_client(self.test_user_1)
+        response = api_client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        comments = Comment.objects.filter(author=self.test_user_1)
+        serialized_data = CommentSerializer(comments, many=True,
+                                            fields=('id', 'body', 'created', 'updated')).data
+        self.assertEqual(serialized_data, response.data['results'])
+
+    def test_owner_get_comment(self):
+        url = reverse('comment-detail', args=(self.comment.id, ))
+        api_client = self.get_client(self.test_user_1)
+        response = api_client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        post = Comment.objects.get(id=self.comment.id)
+        serialized_data = CommentSerializer(post, fields=('id', 'body',
+                                                          'created', 'updated')).data
+        self.assertEqual(serialized_data, response.data)
+
+    def test_not_owner_get_comment(self):
+        url = reverse('comment-detail', args=(self.comment.id, ))
+        api_client = self.get_client(self.test_user_2)
+        response = api_client.get(url)
+        self.assertEqual(status.HTTP_403_FORBIDDEN, response.status_code)
+
+    def test_staff_get_comment(self):
+        url = reverse('comment-detail', args=(self.comment.id, ))
+        api_client = self.get_client(self.test_user_3)
+        response = api_client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        post = Comment.objects.get(id=self.comment.id)
+        serialized_data = CommentSerializer(post, fields=('id', 'author', 'body',
+                                                          'created', 'updated')).data
+        self.assertEqual(serialized_data, response.data)
+
+    def test_update_comment(self):
+        url = reverse('comment-detail', args=(self.comment.id, ))
+        api_client = self.get_client(self.test_user_1)
+        data = {
+            'body': 'Update comment'
+        }
+        json_data = json.dumps(data)
+        response = api_client.patch(url, data=json_data, content_type='application/json')
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.comment.refresh_from_db()
+        self.assertEqual('Update comment', self.comment.body)
+
+    def test_not_owner_update_comment(self):
+        url = reverse('comment-detail', args=(self.comment.id,))
+        api_client = self.get_client(self.test_user_2)
+        data = {
+            'body': 'Update comment'
+        }
+        json_data = json.dumps(data)
+        response = api_client.patch(url, data=json_data, content_type='application/json')
+        self.assertEqual(status.HTTP_403_FORBIDDEN, response.status_code)
+        self.comment.refresh_from_db()
+        self.assertEqual('Test comment', self.comment.body)
+
+    def test_staff_update_comment(self):
+        url = reverse('comment-detail', args=(self.comment.id,))
+        api_client = self.get_client(self.test_user_3)
+        data = {
+            'body': 'Update comment'
+        }
+        json_data = json.dumps(data)
+        response = api_client.patch(url, data=json_data, content_type='application/json')
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+        self.comment.refresh_from_db()
+        self.assertEqual('Update comment', self.comment.body)
+
+    def test_delete_comment(self):
+        self.assertEqual(1, Comment.objects.filter(author=self.test_user_1).count())
+        url = reverse('comment-detail', args=(self.comment.id, ))
+        api_client = self.get_client(self.test_user_1)
+        response = api_client.delete(url)
+        self.assertEqual(status.HTTP_204_NO_CONTENT, response.status_code)
+        self.assertEqual(0, Comment.objects.filter(author=self.test_user_1).count())
+
+    def test_not_owner_delete_comment(self):
+        self.assertEqual(1, Comment.objects.filter(author=self.test_user_1).count())
+        url = reverse('comment-detail', args=(self.comment.id,))
+        api_client = self.get_client(self.test_user_2)
+        response = api_client.delete(url)
+        self.assertEqual(status.HTTP_403_FORBIDDEN, response.status_code)
+        self.assertEqual(1, Comment.objects.filter(author=self.test_user_1).count())
+
+    def test_staff_delete_comment(self):
+        self.assertEqual(1, Comment.objects.filter(author=self.test_user_1).count())
+        url = reverse('comment-detail', args=(self.comment.id, ))
+        api_client = self.get_client(self.test_user_3)
+        response = api_client.delete(url)
+        self.assertEqual(status.HTTP_204_NO_CONTENT, response.status_code)
+        self.assertEqual(0, Comment.objects.filter(author=self.test_user_1).count())
