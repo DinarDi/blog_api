@@ -1,11 +1,13 @@
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from blog.models import Post
 from blog.pagination import ListPagination
-from blog.serializers import PostSerializer
+from blog.serializers import PostSerializer, CommentSerializer
 from blog.permissions import IsOwnerOrStaffOrReadOnly, PermissionForUpdate
 
 
@@ -20,6 +22,8 @@ class PostViewSet(ModelViewSet):
     def get_permissions(self):
         if self.action in ['update', 'partial_update']:
             permission_classes = [IsOwnerOrStaffOrReadOnly, PermissionForUpdate]
+        elif self.action == 'add_comment':
+            permission_classes = [IsAuthenticated]
         else:
             permission_classes = [IsOwnerOrStaffOrReadOnly]
         return [permission() for permission in permission_classes]
@@ -77,6 +81,21 @@ class PostViewSet(ModelViewSet):
         serializer = PostSerializer(page, many=True,
                                     fields=('id', 'title', 'body', 'status'))
         return self.get_paginated_response(serializer.data)
+
+    @action(detail=True, methods=['post'])
+    def add_comment(self, request, pk=None):
+        """
+        Action for add comment to the post
+        """
+        post = self.get_object()
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.validated_data['author'] = self.request.user
+            serializer.validated_data['post'] = post
+            serializer.save()
+            return Response({'status': 'Comment added'})
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def perform_create(self, serializer):
         serializer.validated_data['author'] = self.request.user
