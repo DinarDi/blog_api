@@ -1,5 +1,6 @@
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from blog.models import Post
@@ -48,6 +49,21 @@ class PostViewSet(ModelViewSet):
                                          fields=('id', 'author', 'title', 'body',
                                                  'created', 'updated'))
         return self.get_paginated_response(serializer.data)
+
+    def retrieve(self, request, *args, **kwargs):
+        """
+        Method for get post depending on the user. If it's owner - return data with fields for owner,
+        else return data with fields for all users.
+        """
+        instance = self.get_object()
+        if instance.author == self.request.user:
+            serializer = self.get_serializer(instance, fields=('id', 'title', 'body',
+                                                               'status'))
+            return Response(serializer.data)
+        else:
+            serializer = self.get_serializer(instance, fields=('id', 'author', 'title',
+                                                               'body'))
+            return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
     def my_posts(self, request):
