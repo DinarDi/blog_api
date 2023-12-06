@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.utils import dateparse
 
 from blog.models import Post, Comment
-from blog.serializers import AuthorInfoSerializer, PostSerializer, PostDetailSerializer
+from blog.serializers import AuthorInfoSerializer, PostSerializer, PostDetailSerializer, CommentSerializer
 
 
 class AuthorInfoSerializerTestCase(TestCase):
@@ -207,4 +207,31 @@ class PostDetailSerializerTestCase(TestCase):
         for comment in serialized_data['comments']:
             comment['created'] = dateparse.parse_datetime(comment['created'])
             comment['updated'] = dateparse.parse_datetime(comment['updated'])
+        self.assertEqual(expected_data, serialized_data)
+
+
+class CommentSerializerTestCase(TestCase):
+    def setUp(self):
+        self.test_user_1 = User.objects.create(username='user_1')
+        self.test_user_2 = User.objects.create(username='user_2')
+
+        self.post = Post.objects.create(title='Some post', body='Some body', author=self.test_user_1,
+                                        status='PB')
+        self.comment = Comment.objects.create(body='Some comment', author=self.test_user_2, post=self.post)
+
+    def test_comment_serializer(self):
+        serialized_data = CommentSerializer(self.comment).data
+        expected_data = {
+            'id': self.comment.id,
+            'author': {
+                'id': self.test_user_2.id,
+                'first_name': self.test_user_2.first_name,
+                'last_name': self.test_user_2.last_name
+            },
+            'body': 'Some comment',
+            'created': self.comment.created,
+            'updated': self.comment.updated
+        }
+        serialized_data['created'] = dateparse.parse_datetime(serialized_data['created'])
+        serialized_data['updated'] = dateparse.parse_datetime(serialized_data['updated'])
         self.assertEqual(expected_data, serialized_data)
