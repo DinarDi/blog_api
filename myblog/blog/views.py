@@ -7,7 +7,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from blog.models import Post
 from blog.pagination import ListPagination
-from blog.serializers import PostSerializer, CommentSerializer
+from blog.serializers import PostSerializer, CommentSerializer, PostDetailSerializer
 from blog.permissions import IsOwnerOrStaffOrReadOnly, PermissionForUpdate
 
 
@@ -61,12 +61,12 @@ class PostViewSet(ModelViewSet):
         """
         instance = self.get_object()
         if instance.author == self.request.user:
-            serializer = self.get_serializer(instance, fields=('id', 'title', 'body',
-                                                               'status'))
+            serializer = PostDetailSerializer(instance, fields=('id', 'title', 'body',
+                                                                'status', 'comments'))
             return Response(serializer.data)
         else:
-            serializer = self.get_serializer(instance, fields=('id', 'author', 'title',
-                                                               'body'))
+            serializer = PostDetailSerializer(instance, fields=('id', 'author', 'title',
+                                                                'body', 'comments'))
             return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
