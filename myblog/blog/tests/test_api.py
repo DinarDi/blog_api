@@ -3,6 +3,7 @@ import json
 from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
+from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase, APIClient
 
 from blog.models import Post
@@ -246,3 +247,111 @@ class PostApiTestCase(APITestCase, GeneralMethodsForTest):
 
         post_count_after = Post.objects.all().count()
         self.assertEqual(3, post_count_after)
+
+
+class PaginationTestCase(APITestCase, GeneralMethodsForTest):
+    def setUp(self):
+        self.test_user_1 = User.objects.create(username='test_user_1')
+        self.test_user_2 = User.objects.create(username='test_user_2')
+
+        self.post_1 = Post.objects.create(title='Some post new', body='Some body',
+                                          author=self.test_user_1, status="PB")
+        self.post_2 = Post.objects.create(title='Some post 2', body='Some body 2',
+                                          author=self.test_user_2, status="PB")
+        self.post_3 = Post.objects.create(title='Some post 3', body='Some body new 3',
+                                          author=self.test_user_1, status="PB")
+        self.post_4 = Post.objects.create(title='Some post new', body='Some body post',
+                                          author=self.test_user_1, status="PB")
+
+    def test_pagination_posts(self):
+        url = reverse('post-list')
+        api_client = self.get_client(self.test_user_1)
+
+        response_1 = api_client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response_1.status_code)
+
+        posts = Post.objects.filter(status='PB')
+        serialized_data = PostSerializer(posts, many=True,
+                                         fields=(
+                                             'id', 'author', 'title',
+                                             'body', 'created', 'updated'
+                                         )).data
+        expected_data_page_1 = {
+            'count': posts.count(),
+            'next': 'http://testserver/api/posts/?page_size=2',
+            'previous': None,
+            'results': serialized_data[:2]
+        }
+        self.assertEqual(expected_data_page_1, response_1.data)
+
+        response_2 = api_client.get(response_1.data['next'])
+        self.assertEqual(status.HTTP_200_OK, response_2.status_code)
+
+        expected_data_page_2 = {
+            'count': posts.count(),
+            'next': None,
+            'previous': 'http://testserver/api/posts/',
+            'results': serialized_data[2:]
+        }
+        self.assertEqual(expected_data_page_2, response_2.data)
+
+    def test_pagination_posts_wrong(self):
+        url = reverse('post-list')
+        api_client = self.get_client(self.test_user_1)
+        response = api_client.get(url, {'page_size': 10000})
+        self.assertEqual(status.HTTP_404_NOT_FOUND, response.status_code)
+
+        expected_data = {
+            'detail': ErrorDetail(string='Invalid page.', code='not_found')
+        }
+        self.assertEqual(expected_data, response.data)
+
+        response_2 = api_client.get(url, {'page_size': 'asdas'})
+        self.assertEqual(expected_data, response_2.data)
+
+    def test_my_posts_pagination(self):
+        url = reverse('post-my-posts')
+        api_client = self.get_client(self.test_user_1)
+        posts = Post.objects.filter(author=self.test_user_1)
+
+        response_1 = api_client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response_1.status_code)
+
+        serialized_data = PostSerializer(posts, many=True,
+                                         fields=(
+                                             'id', 'title', 'body', 'status'
+                                         )).data
+        expected_data_1 = {
+            'count': posts.count(),
+            'next': 'http://testserver/api/posts/my_posts/?page_size=2',
+            'previous': None,
+            'results': serialized_data[:2]
+        }
+        self.assertEqual(expected_data_1, response_1.data)
+
+        response_2 = api_client.get(response_1.data['next'])
+        self.assertEqual(status.HTTP_200_OK, response_2.status_code)
+
+        expected_data_2 = {
+            'count': posts.count(),
+            'next': None,
+            'previous': 'http://testserver/api/posts/my_posts/',
+            'results': serialized_data[2:]
+        }
+        self.assertEqual(expected_data_2, response_2.data)
+
+    def test_my_posts_pagination_wrong(self):
+        url = reverse('post-my-posts')
+        api_client = self.get_client(self.test_user_1)
+
+        response_1 = api_client.get(url, {'page_size': 10000})
+        self.assertEqual(status.HTTP_404_NOT_FOUND, response_1.status_code)
+
+        expected_data = {
+            'detail': ErrorDetail(string='Invalid page.', code='not_found')
+        }
+        self.assertEqual(expected_data, response_1.data)
+
+        response_2 = api_client.get(url, {'page_size': 'asd'})
+        self.assertEqual(status.HTTP_404_NOT_FOUND, response_2.status_code)
+        self.assertEqual(expected_data, response_2.data)
