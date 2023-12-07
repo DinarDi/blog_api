@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 
 from rest_framework import serializers
 
-from blog.models import Post, Comment
+from blog.models import Post, Comment, UserPostRelation
 from blog.pagination import ListPagination
 
 
@@ -84,3 +84,12 @@ class PostDetailSerializer(DynamicFieldsModelSerializer, PostBaseSerializer):
 
         serializer = CommentSerializer(comments, many=True)
         return serializer.data
+
+
+class UserPostRelationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for UserPostRelation
+    """
+    class Meta:
+        model = UserPostRelation
+        fields = ('like', 'in_bookmarks')
