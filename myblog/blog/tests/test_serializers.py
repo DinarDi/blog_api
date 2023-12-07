@@ -2,8 +2,10 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.utils import dateparse
 
-from blog.models import Post, Comment
-from blog.serializers import AuthorInfoSerializer, PostSerializer, PostDetailSerializer, CommentSerializer
+from blog.models import Post, Comment, UserPostRelation
+from blog.serializers import (AuthorInfoSerializer, PostSerializer,
+                              PostDetailSerializer, CommentSerializer,
+                              UserPostRelationSerializer)
 
 
 class AuthorInfoSerializerTestCase(TestCase):
@@ -234,4 +236,23 @@ class CommentSerializerTestCase(TestCase):
         }
         serialized_data['created'] = dateparse.parse_datetime(serialized_data['created'])
         serialized_data['updated'] = dateparse.parse_datetime(serialized_data['updated'])
+        self.assertEqual(expected_data, serialized_data)
+
+
+class UserPostRelationSerializerTestCase(TestCase):
+    def setUp(self):
+        self.test_user_1 = User.objects.create(username='user_1')
+        self.test_user_2 = User.objects.create(username='user_2')
+
+        self.post = Post.objects.create(title='Some post', body='Some body', author=self.test_user_1,
+                                        status='PB')
+
+        self.relation = UserPostRelation(user=self.test_user_2, post=self.post)
+
+    def test_relation(self):
+        serialized_data = UserPostRelationSerializer(self.relation).data
+        expected_data = {
+            'like': False,
+            'in_bookmarks': False
+        }
         self.assertEqual(expected_data, serialized_data)
