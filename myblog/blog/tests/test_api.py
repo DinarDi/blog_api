@@ -6,8 +6,8 @@ from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
 from rest_framework.test import APITestCase, APIClient
 
-from blog.models import Post, Comment
-from blog.serializers import PostSerializer, PostDetailSerializer, CommentSerializer
+from blog.models import Post, Comment, UserPostRelation
+from blog.serializers import PostSerializer, PostDetailSerializer, CommentSerializer, UserPostRelationSerializer
 
 
 class GeneralMethodsForTest:
@@ -517,3 +517,68 @@ class CommentsApiTestCase(APITestCase, GeneralMethodsForTest):
         response = api_client.delete(url)
         self.assertEqual(status.HTTP_204_NO_CONTENT, response.status_code)
         self.assertEqual(0, Comment.objects.filter(author=self.test_user_1).count())
+
+
+class UserPostRelationTestCase(APITestCase, GeneralMethodsForTest):
+    def setUp(self):
+        self.test_user_1 = User.objects.create(username='user_1')
+        self.test_user_2 = User.objects.create(username='user_2')
+
+        self.post = Post.objects.create(title='Some post', body='Some body', author=self.test_user_1,
+                                        status='PB')
+
+    def test_like(self):
+        url = reverse('userpostrelation-detail', args=(self.post.id, ))
+        api_client = self.get_client(self.test_user_2)
+
+        # Like
+        data_like = {
+            'like': True
+        }
+        json_data = json.dumps(data_like)
+        response = api_client.patch(url, data=json_data, content_type='application/json')
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        relation = UserPostRelation.objects.get(user=self.test_user_2, post=self.post)
+        serialized_data = UserPostRelationSerializer(relation).data
+        self.assertEqual(response.data, serialized_data)
+
+        # Unlike
+        data_unlike = {
+            'like': False
+        }
+        json_data = json.dumps(data_unlike)
+        response = api_client.patch(url, data=json_data, content_type='application/json')
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        relation.refresh_from_db()
+        serialized_data = UserPostRelationSerializer(relation).data
+        self.assertEqual(serialized_data, response.data)
+
+    def test_bookmarks(self):
+        url = reverse('userpostrelation-detail', args=(self.post.id, ))
+        api_client = self.get_client(self.test_user_2)
+
+        # Add bookmarks
+        data_in = {
+            'in_bookmarks': True
+        }
+        json_data = json.dumps(data_in)
+        response = api_client.patch(url, data=json_data, content_type='application/json')
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        relation = UserPostRelation.objects.get(user=self.test_user_2, post=self.post)
+        serialized_data = UserPostRelationSerializer(relation).data
+        self.assertEqual(response.data, serialized_data)
+
+        # Unlike
+        data_out = {
+            'in_bookmarks': False
+        }
+        json_data = json.dumps(data_out)
+        response = api_client.patch(url, data=json_data, content_type='application/json')
+        self.assertEqual(status.HTTP_200_OK, response.status_code)
+
+        relation.refresh_from_db()
+        serialized_data = UserPostRelationSerializer(relation).data
+        self.assertEqual(serialized_data, response.data)
