@@ -19,12 +19,12 @@ from django.urls import path, include, re_path
 
 from rest_framework.routers import SimpleRouter
 
-from blog.views import PostViewSet, CommentViewSet
-
+from blog.views import PostViewSet, CommentViewSet, UserPostRelationViewSet
 
 router = SimpleRouter()
 router.register('posts', PostViewSet)
 router.register('comments', CommentViewSet)
+router.register('post_relation', UserPostRelationViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
