@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.db.models import Count, Case, When
 from django.test import TestCase
 from django.utils import dateparse
 
@@ -38,7 +39,10 @@ class PostSerializerTestCase(TestCase):
                                           author=self.test_user_2, status='PB')
 
     def test_post_serializer_with_fields(self):
-        posts = Post.objects.all()
+        posts = Post.objects.all().annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        ).order_by('id')
         serialized_data = PostSerializer(posts, many=True,
                                          fields=('id', 'title', 'body')).data
         expected_data = [
@@ -61,7 +65,10 @@ class PostSerializerTestCase(TestCase):
         self.assertEqual(expected_data, serialized_data)
 
     def test_post_serializer_without_fields(self):
-        posts = Post.objects.all().order_by('id')
+        posts = Post.objects.all().annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        ).order_by('id')
         serialized_data = PostSerializer(posts, many=True).data
         expected_data = [
             {
@@ -73,6 +80,8 @@ class PostSerializerTestCase(TestCase):
                 },
                 'title': 'Some post 1',
                 'body': 'Some body 1',
+                'likes_count': 0,
+                'bookmarks_count': 0,
                 'status': 'PB',
                 'created': self.post_1.created,
                 'updated': self.post_1.updated
@@ -86,6 +95,8 @@ class PostSerializerTestCase(TestCase):
                 },
                 'title': 'Some post 2',
                 'body': 'Some body 2',
+                'likes_count': 0,
+                'bookmarks_count': 0,
                 'status': 'PB',
                 'created': self.post_2.created,
                 'updated': self.post_2.updated
@@ -99,6 +110,8 @@ class PostSerializerTestCase(TestCase):
                 },
                 'title': 'Some post 3',
                 'body': 'Some body 3',
+                'likes_count': 0,
+                'bookmarks_count': 0,
                 'status': 'PB',
                 'created': self.post_3.created,
                 'updated': self.post_3.updated
@@ -124,7 +137,10 @@ class PostDetailSerializerTestCase(TestCase):
                                body='Comment 2')
 
     def test_post_detail_serializer_with_fields(self):
-        post = Post.objects.get(id=self.post_1.id)
+        post = Post.objects.annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        ).get(id=self.post_1.id)
         serialized_data = PostDetailSerializer(post, fields=(
             'id', 'title',
             'body', 'comments',
@@ -164,7 +180,10 @@ class PostDetailSerializerTestCase(TestCase):
         self.assertEqual(expected_data, serialized_data)
 
     def test_post_detail_serializer_without_fields(self):
-        post = Post.objects.get(id=self.post_1.id)
+        post = Post.objects.annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        ).get(id=self.post_1.id)
         serialized_data = PostDetailSerializer(post).data
         expected_data = {
             'id': self.post_1.id,
@@ -178,6 +197,8 @@ class PostDetailSerializerTestCase(TestCase):
             'status': 'PB',
             'created': self.post_1.created,
             'updated': self.post_1.updated,
+            'likes_count': 0,
+            'bookmarks_count': 0,
             'comments': [
                 {
                     'id': self.comment_1.id,

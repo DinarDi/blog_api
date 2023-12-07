@@ -1,6 +1,7 @@
 import json
 
 from django.contrib.auth.models import User
+from django.db.models import Count, Case, When
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.exceptions import ErrorDetail
@@ -42,32 +43,41 @@ class PostApiTestCase(APITestCase, GeneralMethodsForTest):
         self.post_4 = Post.objects.create(title='Some post 4', body='Some body new 4',
                                           author=self.test_user_1, status='DF')
 
+        self.relation = UserPostRelation.objects.create(user=self.test_user_1, post=self.post_2, like=True)
+
     def test_get_posts(self):
         url = reverse('post-list')
-        posts = Post.objects.filter(status='PB')
-
+        posts = Post.objects.filter(status='PB').annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        )
         response = self.client.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.assertEqual(posts.count(), response.data['count'])
+
         serialized_data = PostSerializer(posts, many=True,
                                          fields=(
                                              'id', 'author', 'title',
-                                             'body', 'created', 'updated'
+                                             'body', 'likes_count', 'bookmarks_count',
+                                             'created', 'updated'
                                          )).data
         self.assertEqual(serialized_data[:2], response.data['results'])
 
     def test_get_my_posts(self):
         url = reverse('post-my-posts')
         user = self.get_client(self.test_user_1)
-        posts = Post.objects.filter(author=self.test_user_1)
-
+        posts = Post.objects.filter(author=self.test_user_1).annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        )
         response = user.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
         self.assertEqual(posts.count(), response.data['count'])
 
         serialized_data = PostSerializer(posts, many=True,
                                          fields=(
-                                             'id', 'title', 'body', 'status'
+                                             'id', 'title', 'body', 'likes_count',
+                                             'bookmarks_count', 'status'
                                          )).data
         self.assertEqual(serialized_data[:2], response.data['results'])
 
@@ -76,14 +86,21 @@ class PostApiTestCase(APITestCase, GeneralMethodsForTest):
         response = self.client.get(url)
         self.assertEqual(status.HTTP_200_OK, response.status_code)
 
-        post = Post.objects.get(id=self.post_2.id)
+        post = Post.objects.all().annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        ).get(id=self.post_2.id)
         serialized_data = PostDetailSerializer(post, fields=('id', 'author', 'title',
-                                                             'body', 'comments')).data
+                                                             'body', 'likes_count',
+                                                             'bookmarks_count', 'comments')).data
         self.assertEqual(serialized_data, response.data)
 
     def test_search_posts(self):
         url = reverse('post-list')
-        posts = Post.objects.filter(id__in=[self.post_1.id, self.post_3.id]).order_by('id')
+        posts = Post.objects.filter(id__in=[self.post_1.id, self.post_3.id]).annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        ).order_by('id')
 
         response = self.client.get(url, data={'search': 'new'})
         self.assertEqual(status.HTTP_200_OK, response.status_code)
@@ -92,13 +109,17 @@ class PostApiTestCase(APITestCase, GeneralMethodsForTest):
         serialized_data = PostSerializer(posts, many=True,
                                          fields=(
                                              'id', 'author', 'title',
-                                             'body', 'created', 'updated'
+                                             'body', 'likes_count', 'bookmarks_count',
+                                             'created', 'updated'
                                          )).data
         self.assertEqual(serialized_data, response.data['results'])
 
     def test_order_posts_plus(self):
         url = reverse('post-list')
-        posts = Post.objects.filter(status='PB').order_by('created')
+        posts = Post.objects.filter(status='PB').annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        ).order_by('created')
 
         response = self.client.get(url, data={'ordering': 'created'})
         self.assertEqual(status.HTTP_200_OK, response.status_code)
@@ -107,13 +128,17 @@ class PostApiTestCase(APITestCase, GeneralMethodsForTest):
         serialized_data = PostSerializer(posts, many=True,
                                          fields=(
                                              'id', 'author', 'title',
-                                             'body', 'created', 'updated'
+                                             'body', 'likes_count', 'bookmarks_count',
+                                             'created', 'updated'
                                          )).data
         self.assertEqual(serialized_data[:2], response.data['results'])
 
     def test_order_posts_minus(self):
         url = reverse('post-list')
-        posts = Post.objects.filter(status='PB').order_by('-created')
+        posts = Post.objects.filter(status='PB').annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        ).order_by('-created')
 
         response = self.client.get(url, data={'ordering': '-created'})
         self.assertEqual(status.HTTP_200_OK, response.status_code)
@@ -122,7 +147,8 @@ class PostApiTestCase(APITestCase, GeneralMethodsForTest):
         serialized_data = PostSerializer(posts, many=True,
                                          fields=(
                                              'id', 'author', 'title',
-                                             'body', 'created', 'updated'
+                                             'body', 'likes_count', 'bookmarks_count',
+                                             'created', 'updated'
                                          )).data
         self.assertEqual(serialized_data[:2], response.data['results'])
 
@@ -273,11 +299,15 @@ class PaginationTestCase(APITestCase, GeneralMethodsForTest):
         response_1 = api_client.get(url)
         self.assertEqual(status.HTTP_200_OK, response_1.status_code)
 
-        posts = Post.objects.filter(status='PB')
+        posts = Post.objects.filter(status='PB').annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        )
         serialized_data = PostSerializer(posts, many=True,
                                          fields=(
                                              'id', 'author', 'title',
-                                             'body', 'created', 'updated'
+                                             'body', 'likes_count',
+                                             'bookmarks_count', 'created', 'updated'
                                          )).data
         expected_data_page_1 = {
             'count': posts.count(),
@@ -315,14 +345,18 @@ class PaginationTestCase(APITestCase, GeneralMethodsForTest):
     def test_my_posts_pagination(self):
         url = reverse('post-my-posts')
         api_client = self.get_client(self.test_user_1)
-        posts = Post.objects.filter(author=self.test_user_1)
+        posts = Post.objects.filter(author=self.test_user_1).annotate(
+            likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+            bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+        )
 
         response_1 = api_client.get(url)
         self.assertEqual(status.HTTP_200_OK, response_1.status_code)
 
         serialized_data = PostSerializer(posts, many=True,
                                          fields=(
-                                             'id', 'title', 'body', 'status'
+                                             'id', 'title', 'body',
+                                             'likes_count', 'bookmarks_count', 'status'
                                          )).data
         expected_data_1 = {
             'count': posts.count(),
