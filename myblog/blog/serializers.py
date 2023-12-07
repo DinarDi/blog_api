@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from rest_framework import serializers
 
 from blog.models import Post, Comment
+from blog.pagination import ListPagination
 
 
 class DynamicFieldsModelSerializer(serializers.ModelSerializer):
@@ -62,9 +63,24 @@ class PostDetailSerializer(DynamicFieldsModelSerializer, PostBaseSerializer):
     """
     Serializer with detail info for posts
     """
-    comments = CommentSerializer(many=True, read_only=True)
+    comments = serializers.SerializerMethodField()
 
     class Meta:
         model = Post
         fields = ('id', 'author', 'title', 'body',
                   'status', 'created', 'updated', 'comments')
+
+    def get_comments(self, obj):
+        """
+        Pagination for nested comments in post
+        """
+        comments = Comment.objects.filter(post=obj)
+        paginator = ListPagination()
+        if self.context.get('request', None):
+            page = paginator.paginate_queryset(comments,
+                                               request=self.context['request'])
+            serializer = CommentSerializer(page, many=True)
+            return serializer.data
+
+        serializer = CommentSerializer(comments, many=True)
+        return serializer.data

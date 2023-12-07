@@ -63,11 +63,13 @@ class PostViewSet(ModelViewSet):
         instance = self.get_object()
         if instance.author == self.request.user:
             serializer = PostDetailSerializer(instance, fields=('id', 'title', 'body',
-                                                                'status', 'comments'))
+                                                                'status', 'comments'),
+                                              context={'request': self.request})
             return Response(serializer.data)
         else:
             serializer = PostDetailSerializer(instance, fields=('id', 'author', 'title',
-                                                                'body', 'comments'))
+                                                                'body', 'comments'),
+                                              context={'request': self.request})
             return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
