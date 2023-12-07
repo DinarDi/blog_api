@@ -109,8 +109,6 @@ class PostApiTestCase(APITestCase, GeneralMethodsForTest):
                                              'id', 'author', 'title',
                                              'body', 'created', 'updated'
                                          )).data
-        print('response:', response.data['results'])
-        print('serialized', serialized_data)
         self.assertEqual(serialized_data[:2], response.data['results'])
 
     def test_order_posts_minus(self):
@@ -126,8 +124,6 @@ class PostApiTestCase(APITestCase, GeneralMethodsForTest):
                                              'id', 'author', 'title',
                                              'body', 'created', 'updated'
                                          )).data
-        print('response:', response.data['results'])
-        print('serialized', serialized_data)
         self.assertEqual(serialized_data[:2], response.data['results'])
 
     def test_create_post(self):
@@ -263,6 +259,13 @@ class PaginationTestCase(APITestCase, GeneralMethodsForTest):
         self.post_4 = Post.objects.create(title='Some post new', body='Some body post',
                                           author=self.test_user_1, status="PB")
 
+        self.comment_1 = Comment.objects.create(author=self.test_user_1, post=self.post_2,
+                                                body='Test comment 1')
+        self.comment_2 = Comment.objects.create(author=self.test_user_1, post=self.post_2,
+                                                body='Test comment 2')
+        self.comment_2 = Comment.objects.create(author=self.test_user_1, post=self.post_2,
+                                                body='Test comment 3')
+
     def test_pagination_posts(self):
         url = reverse('post-list')
         api_client = self.get_client(self.test_user_1)
@@ -355,6 +358,34 @@ class PaginationTestCase(APITestCase, GeneralMethodsForTest):
         response_2 = api_client.get(url, {'page_size': 'asd'})
         self.assertEqual(status.HTTP_404_NOT_FOUND, response_2.status_code)
         self.assertEqual(expected_data, response_2.data)
+
+    def test_my_comments_pagination(self):
+        url = reverse('comment-my-comments')
+        api_client = self.get_client(self.test_user_1)
+        comments = Comment.objects.filter(author=self.test_user_1)
+        response_1 = api_client.get(url)
+        self.assertEqual(status.HTTP_200_OK, response_1.status_code)
+
+        serialized_data = CommentSerializer(comments, many=True, fields=('id', 'body',
+                                                                         'created', 'updated')).data
+        expected_data_1 = {
+            'count': comments.count(),
+            'next': 'http://testserver/api/comments/my_comments/?page_size=2',
+            'previous': None,
+            'results': serialized_data[:2]
+        }
+        self.assertEqual(expected_data_1, response_1.data)
+
+        response_2 = api_client.get(response_1.data['next'])
+        self.assertEqual(status.HTTP_200_OK, response_2.status_code)
+
+        expected_data_2 = {
+            'count': comments.count(),
+            'next': None,
+            'previous': 'http://testserver/api/comments/my_comments/',
+            'results': serialized_data[2:]
+        }
+        self.assertEqual(expected_data_2, response_2.data)
 
 
 class CommentsApiTestCase(APITestCase, GeneralMethodsForTest):
