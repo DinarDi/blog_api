@@ -1,3 +1,4 @@
+from django.db.models import Count, Case, When
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -13,7 +14,10 @@ from blog.permissions import IsOwnerOrStaffOrReadOnly, PermissionForUpdate, ItsO
 
 
 class PostViewSet(ModelViewSet):
-    queryset = Post.objects.all()
+    queryset = Post.objects.all().annotate(
+        likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
+        bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
+    )
     serializer_class = PostSerializer
     pagination_class = ListPagination
     filter_backends = [SearchFilter, OrderingFilter]
@@ -51,7 +55,8 @@ class PostViewSet(ModelViewSet):
         # Pagination
         page = self.paginate_queryset(queryset)
         serializer = self.get_serializer(page, many=True,
-                                         fields=('id', 'author', 'title', 'body',
+                                         fields=('id', 'author', 'title',
+                                                 'body', 'likes_count', 'bookmarks_count',
                                                  'created', 'updated'))
         return self.get_paginated_response(serializer.data)
 
@@ -63,12 +68,14 @@ class PostViewSet(ModelViewSet):
         instance = self.get_object()
         if instance.author == self.request.user:
             serializer = PostDetailSerializer(instance, fields=('id', 'title', 'body',
-                                                                'status', 'comments'),
+                                                                'status', 'likes_count', 'bookmarks_count',
+                                                                'comments'),
                                               context={'request': self.request})
             return Response(serializer.data)
         else:
             serializer = PostDetailSerializer(instance, fields=('id', 'author', 'title',
-                                                                'body', 'comments'),
+                                                                'body', 'likes_count', 'bookmarks_count',
+                                                                'comments'),
                                               context={'request': self.request})
             return Response(serializer.data)
 
@@ -82,7 +89,8 @@ class PostViewSet(ModelViewSet):
         # Pagination
         page = self.paginate_queryset(queryset)
         serializer = PostSerializer(page, many=True,
-                                    fields=('id', 'title', 'body', 'status'))
+                                    fields=('id', 'title', 'body',
+                                            'likes_count', 'bookmarks_count', 'status'))
         return self.get_paginated_response(serializer.data)
 
     @action(detail=True, methods=['post'])

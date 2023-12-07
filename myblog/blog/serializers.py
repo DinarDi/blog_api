@@ -36,6 +36,8 @@ class PostBaseSerializer(serializers.ModelSerializer):
     Base serializer with common fields
     """
     author = AuthorInfoSerializer(read_only=True)
+    likes_count = serializers.IntegerField(read_only=True)
+    bookmarks_count = serializers.IntegerField(read_only=True)
 
 
 class PostSerializer(DynamicFieldsModelSerializer, PostBaseSerializer):
@@ -45,7 +47,8 @@ class PostSerializer(DynamicFieldsModelSerializer, PostBaseSerializer):
     class Meta:
         model = Post
         fields = ('id', 'author', 'title', 'body',
-                  'status', 'created', 'updated')
+                  'likes_count', 'bookmarks_count', 'status',
+                  'created', 'updated')
 
 
 class CommentSerializer(DynamicFieldsModelSerializer):
@@ -68,7 +71,8 @@ class PostDetailSerializer(DynamicFieldsModelSerializer, PostBaseSerializer):
     class Meta:
         model = Post
         fields = ('id', 'author', 'title', 'body',
-                  'status', 'created', 'updated', 'comments')
+                  'status', 'created', 'updated',
+                  'likes_count', 'bookmarks_count', 'comments')
 
     def get_comments(self, obj):
         """
