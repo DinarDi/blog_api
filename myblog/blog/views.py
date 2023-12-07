@@ -6,9 +6,9 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework import mixins
 
-from blog.models import Post, Comment
+from blog.models import Post, Comment, UserPostRelation
 from blog.pagination import ListPagination
-from blog.serializers import PostSerializer, CommentSerializer, PostDetailSerializer
+from blog.serializers import PostSerializer, CommentSerializer, PostDetailSerializer, UserPostRelationSerializer
 from blog.permissions import IsOwnerOrStaffOrReadOnly, PermissionForUpdate, ItsOwnerOrStaff
 
 
@@ -147,3 +147,18 @@ class CommentViewSet(mixins.RetrieveModelMixin,
                                          ))
         return self.get_paginated_response(serializer.data)
 
+
+class UserPostRelationViewSet(mixins.UpdateModelMixin,
+                              GenericViewSet):
+    """
+    ViewSet for create or update relation (like or bookmarks)
+    """
+    queryset = UserPostRelation.objects.all()
+    serializer_class = UserPostRelationSerializer
+    lookup_field = 'post_id'
+    permission_classes = [IsAuthenticated]
+
+    def get_object(self):
+        obj, created = UserPostRelation.objects.get_or_create(user=self.request.user,
+                                                              post_id=self.kwargs['post_id'])
+        return obj
