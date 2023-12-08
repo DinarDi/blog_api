@@ -132,12 +132,12 @@ class PostDetailSerializerTestCase(TestCase):
                                           author=self.test_user_1, status='PB')
 
         self.comment_1 = Comment.objects.create(author=self.test_user_2, post=self.post_1,
-                               body='Comment 1')
+                                                body='Comment 1')
         self.comment_2 = Comment.objects.create(author=self.test_user_2, post=self.post_1,
-                               body='Comment 2')
+                                                body='Comment 2')
 
     def test_post_detail_serializer_with_fields(self):
-        post = Post.objects.annotate(
+        post = Post.objects.all().annotate(
             likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
             bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
         ).get(id=self.post_1.id)
@@ -180,7 +180,7 @@ class PostDetailSerializerTestCase(TestCase):
         self.assertEqual(expected_data, serialized_data)
 
     def test_post_detail_serializer_without_fields(self):
-        post = Post.objects.annotate(
+        post = Post.objects.all().annotate(
             likes_count=Count(Case(When(userpostrelation__like=True, then=1))),
             bookmarks_count=Count(Case(When(userpostrelation__in_bookmarks=True, then=1)))
         ).get(id=self.post_1.id)
