@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.db.models import Prefetch
 
 from rest_framework import serializers
 
@@ -78,7 +79,9 @@ class PostDetailSerializer(DynamicFieldsModelSerializer, PostBaseSerializer):
         """
         Pagination for nested comments in post
         """
-        comments = Comment.objects.filter(post=obj)
+        comments = Comment.objects.filter(post=obj).prefetch_related(
+            Prefetch('author', queryset=User.objects.all().only('first_name', 'last_name'))
+        )
         paginator = ListPagination()
         if self.context.get('request', None):
             page = paginator.paginate_queryset(comments,

@@ -1,4 +1,5 @@
-from django.db.models import Count, Case, When
+from django.contrib.auth.models import User
+from django.db.models import Count, Case, When, Prefetch
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.filters import SearchFilter, OrderingFilter
@@ -36,13 +37,17 @@ class PostViewSet(ModelViewSet):
     def get_queryset(self):
         if self.action == 'list':
             # Return queryset with status "PB"
-            queryset = self.queryset.filter(status='PB')
+            queryset = self.queryset.filter(status='PB').prefetch_related(
+                Prefetch('author', queryset=User.objects.all().only('first_name', 'last_name'))
+            )
             return queryset
         elif self.action == 'my_posts':
             # Return queryset with posts for owner
             user = self.request.user
             queryset = self.queryset.filter(author=user)
             return queryset
+        elif self.action == 'retrieve':
+            return self.queryset.select_related('author')
         else:
             return self.queryset
 
@@ -117,7 +122,7 @@ class CommentViewSet(mixins.RetrieveModelMixin,
                      mixins.UpdateModelMixin,
                      mixins.DestroyModelMixin,
                      GenericViewSet):
-    queryset = Comment.objects.all()
+    queryset = Comment.objects.all().select_related('author')
     serializer_class = CommentSerializer
     pagination_class = ListPagination
     permission_classes = [ItsOwnerOrStaff]
